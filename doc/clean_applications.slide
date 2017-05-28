@@ -1,0 +1,167 @@
+Building Clean Testable Applications
+Application Structure, Onion Archicture, Dependency Inversion and Dependency Injection
+31 May 2017
+
+Craig Brookes
+Software Engineer, Red Hat
+http://simplycode.me/
+http://ideomaticgo.com/
+@maleck13
+
+
+* Why build clean well architected testable applications?
+
+- Code is meant to be read and understood.
+
+- With any real world application, a lot more time is spent maintaining, debugging and enhancing than on green field projects or major rewrites.
+
+- As a developer, your codebases are your home. Think carefully about where you want to live.   
+
+- Finally the words "clean" and "well architected" are subjective. I am no expert, but I have gained some knowledge through experience and research and thats what I am going to share.  
+
+
+
+* Application Architecture and Structure: It's Hard
+
+- It's ok. You will get it wrong.
+
+- We often see structures and names that reflect the architecture and the framework rather than the purpose of the application. 
+
+- Anyone tell me what this app's purpose is?
+.code spring_structure.md
+
+
+* Application Architecture and Structure: It's Hard (continued)
+- Here's another. Anyone tell me what this architectural pattern is?
+.code rails_structure.md
+
+
+* Application Architecture and Structure: It's Hard (continued)
+
+Generally we end up with a "traditional" layered architecture.
+
+.image layered.png
+ 
+The center of our application is the database and the web and as everything depends on the layer below, everything depends on the database or the web.
+.caption The web is a detail and the database is infrastructure. It is not the center of your business. [Robert C Martin]    
+
+* How about this one?
+
+.code onion.md
+
+Hopefully its clear that this is an onion shop that has several core business domains and usecases of those domains. Also that it uses a database, has a web interface and a cli interface.
+
+- Each section is a distict and clear layer of your application.
+- The hard part here is understanding how we bring these layers together.
+- This is where the onions come in.
+
+
+
+* Applications are like onions (Thanks Shrek) 
+.link http://jeffreypalermo.com/blog/the-onion-architecture-part-2/ Jeffery Palermo Onion Archicture
+
+Onions have layers, applications have layers.
+
+.image onion.png
+
+Its a little abstract, so lets break this image down and give it more concrete meaning.
+
+
+
+* Back to our shop
+
+Each of the outer layers of the onion depend on inner layer. Inner layers do not depend out outer layers.
+
+.code onion_annotated.md
+
+
+
+* Core Principals
+
+- Infrastructure (databases, frameworks) are no longer at the center, they are an external edge dependency.
+
+-  Dependency Inversion
+Outer layers can depend on inner layers, but inner layers *must* *not*  depend directly on any code in the outer layer. 
+
+By declaring that our models and business logic cannot depend on our infrastructure or user interfaces, we are forced to treat our framwork and database as a set of interfaces (more on this later). 
+
+- Dependency Injection 
+
+Again as the core layers of our onion cannot know about the outer layers, we need to use dependency injection in order to inject concrete implementations of our core interfaces. The core has no interest in MYSQL or MongoDB, it only cares that the interfaces it declared are being satisfied.
+
+* Domain Model Layer 
+
+This is the center of the onion. It models all of our important buisness objects and depends on no other part of our application.
+
+.code ../pkg/shop/types.go
+
+
+* Domain Service Layer
+
+This is where our buisness logic resides. It uses interfaces to define its dependencies and only on the Domain Model layer.
+.code ../pkg/shop/interfaces.go
+.code ../pkg/shop/order/service.go
+
+
+
+* Application Service Layer 
+
+This layer represents use cases. It orchestrates the flow of data between different domain services in order to 
+action these use cases. Other than orchestration they are logicless.
+
+.code ../pkg/shop/usecase/order.go
+
+
+* Infrastructure Layer 
+This is made up of our external dependencies. For example 3rd party integrations, the file system and of course the database. It is on the edge and can depend on any of the internal layers but nothing depends directly on it. Often it implements the interfaces defined in the Domain Service Layer.
+
+.code ../pkg/database/orderRepo.go
+
+* User Interface Layer 
+
+Also in the most outer layer. This is made up of any way that the application can be interacted with (HTTP (Web Framework), tests, cli). It can depend on any of the lower layers. 
+
+.code ../pkg/web/catalog.go
+
+The job of this layer is to parse the protocol sepcific request into buisness objects. Hand off to the buisness logic layer and then handle sending back a response.
+
+* Benifits
+
+- *Simpler* *testing* 
+Forced indirection to the outer layers such as the database and http protocol by the use of  interfaces and dependency injection allow isolated unit tests. 
+
+Supports the testing pyramid: lots of unit tests, less integration tests and a few black box end to end tests.
+
+
+
+* Benifits
+- *Loose* *Coupling:* 
+Our most valuable code, our buisness logic, is entirely decoupled from the database or the user interface. Everything depends on it, it depends on nothing. 
+
+
+
+* Benifits
+- *Flexible:* 
+If we wanted to switch database or add a new form of user interface (chat bot anyone), our buisness logic would remain untouched. We would be required to add a new piece, a plugin to the outermost layer only.
+
+
+* Benifits
+- *Supports* *Domain* *Driven* *Design:* 
+As it puts the domains at the center of the application, it compliments working with a DDD approach.
+
+
+* Draw Backs
+
+- *Increased* *Complexity:* 
+Using dependency injection and the indirection of interfaces adds a certain amount of overhead.
+
+- *Learning* *Curve:* 
+Like most things, you're probably going to get it wrong the first time.
+
+* More Info
+
+.link http://jeffreypalermo.com/blog/the-onion-architecture-part-3/ Onion Architecture.
+
+.link https://testing.googleblog.com/2015/04/just-say-no-to-more-end-to-end-tests.html Testing Pyramid
+
+.link http://domainlanguage.com/ddd/ Domain Driven Design
